@@ -29,9 +29,8 @@ use serde::{
     Deserialize,
     Serialize,
 };
-use std::collections::HashMap;
-
 use std::{
+    collections::HashMap,
     path::PathBuf,
     process::Command,
 };
@@ -216,20 +215,28 @@ impl DocSource for CommentsDatabase {
             .par_iter()
             .filter(|(hash, _, _)| !self.is_in_cache(hash))
             .map(|(hash, path, content)| {
-                let ast = rnix::Root::parse(content).ok().unwrap();
+                let ast = match rnix::Root::parse(content).ok() {
+                    Ok(ast) => ast,
+                    Err(e) => {
+                        eprintln!("Error parsing {}: {}", path.display(), e);
+                        return (*hash, Vec::new());
+                    }
+                };
+
                 let definitions = walk_ast(ast)
                     .into_iter()
                     .map(|def| def.with_path(path.clone()))
                     .collect();
-                (hash, definitions)
+
+                (*hash, definitions)
             })
-            .collect::<Vec<(&u32, Vec<CommentDocumentation>)>>();
+            .collect::<Vec<(u32, Vec<CommentDocumentation>)>>();
         if new_defs.is_empty() {
             return Ok(false);
         }
 
         for (hash, defs) in new_defs {
-            self.add_to_cache(*hash, defs);
+            self.add_to_cache(hash, defs);
         }
 
         Ok(true)
