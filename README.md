@@ -67,4 +67,5 @@ nix run 'github:nix-community/manix' mapAttrs
 
 ## Kudos
 
+The original [manix](https://github.com/mlvzk/manix). mlvzk has been inactive for over a year, we thank him for his hard work.
 The inspiration for this project came from [nix-doc](https://github.com/lf-/nix-doc)
