@@ -9,6 +9,8 @@ authors = ["mlvzk <mlvzk@protonmail.com>", "n16hth4wk <lecoqjacob@gmail.com>"]
 [dependencies]
 anyhow = "1"
 bincode = "1"
+clap_complete = "4.4.9"
+clap_complete_nushell = "4.4.2"
 colored = "2"
 crc32fast = "1"
 lazy_static = "1"
