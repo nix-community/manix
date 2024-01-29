@@ -4,52 +4,49 @@ use anyhow::{
 };
 use colored::*;
 use comments_docsource::CommentsDatabase;
-use lazy_static::lazy_static;
+use strum::VariantNames;
 use manix::*;
 use options_docsource::{
     OptionsDatabase,
     OptionsDatabaseType,
 };
 use std::path::PathBuf;
-use structopt::{
-    clap::arg_enum,
-    StructOpt,
-};
+use clap::{Parser, ValueEnum};
+use lazy_static::lazy_static;
 
-arg_enum! {
-    #[derive(Debug, PartialEq)]
-    #[allow(non_camel_case_types)]
-    enum Source {
-        hm_options,
-        nd_options,
-        nixos_options,
-        nixpkgs_doc,
-        nixpkgs_tree,
-        nixpkgs_comments,
-    }
+#[derive(Debug, PartialEq, Clone, ValueEnum, VariantNames)]
+#[allow(non_camel_case_types)]
+#[strum(serialize_all = "kebab-case")]
+enum Source {
+    hm_options,
+    nd_options,
+    nixos_options,
+    nixpkgs_doc,
+    nixpkgs_tree,
+    nixpkgs_comments,
 }
 
 lazy_static! {
-    static ref SOURCE_VARIANTS: String = Source::variants().join(",");
+    static ref SOURCE_VARIANTS: String = Source::VARIANTS.join(",").to_string();
 }
 
-#[derive(StructOpt)]
-#[structopt(name = "manix")]
+#[derive(Parser)]
+#[clap(name = "manix")]
 struct Opt {
     /// Force update cache
-    #[structopt(short, long)]
+    #[arg(short, long)]
     update_cache: bool,
 
     /// Matches entries stricly
-    #[structopt(short, long)]
+    #[arg(short, long)]
     strict: bool,
 
     /// Restrict search to chosen sources
-    #[structopt(long, possible_values = &Source::variants(), default_value = &SOURCE_VARIANTS, use_delimiter = true)]
+    #[arg(long, value_enum, default_value = &**SOURCE_VARIANTS, use_value_delimiter = true)]
     source: Vec<Source>,
 
     /// Query to search for
-    #[structopt(name = "QUERY")]
+    #[arg(name = "QUERY")]
     query: String,
 }
 
@@ -117,7 +114,7 @@ where
 }
 
 fn main() -> Result<()> {
-    let opt: Opt = Opt::from_args();
+    let opt: Opt = Opt::parse();
 
     let cache_dir =
         xdg::BaseDirectories::with_prefix("manix").context("Failed to get a cache directory")?;
