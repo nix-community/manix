@@ -14,6 +14,7 @@ use std::{path::PathBuf, io};
 use clap::{Parser, ValueEnum, ValueHint, Command, CommandFactory};
 use lazy_static::lazy_static;
 use clap_complete::{generate, Generator, Shell, generator};
+use clap_mangen::Man;
 
 #[derive(Debug, PartialEq, Clone, ValueEnum, VariantNames)]
 #[allow(non_camel_case_types)]
@@ -63,6 +64,9 @@ struct Opt {
     /// Generate completions for the specified shell
     #[arg(long = "generate", value_enum)]
     generator: Option<ShellCompletion>,
+
+    #[arg(long = "print-man")]
+    man: bool,
 }
 
 fn build_source_and_add<T>(
@@ -147,6 +151,15 @@ fn main() -> Result<()> {
 	    	ShellCompletion::Powershell => print_completions(Shell::PowerShell, &mut cmd),
 	    	ShellCompletion::Zsh => print_completions(Shell::Zsh , &mut cmd)
 	    }
+
+        Ok(())
+    } else {
+
+    if opt.man {
+        let cmd = Opt::command();
+        eprintln!("Generating manpage...");
+        
+        Man::new(cmd).render(&mut io::stdout()).unwrap();
 
         Ok(())
     } else {
@@ -353,4 +366,4 @@ fn main() -> Result<()> {
     }
 
     Ok(())
-}}
+}}}
