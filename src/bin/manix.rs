@@ -10,9 +10,10 @@ use options_docsource::{
     OptionsDatabase,
     OptionsDatabaseType,
 };
-use std::path::PathBuf;
-use clap::{Parser, ValueEnum};
+use std::{path::PathBuf, io};
+use clap::{Parser, ValueEnum, ValueHint, Command, CommandFactory};
 use lazy_static::lazy_static;
+use clap_complete::{generate, Generator, Shell, generator};
 
 #[derive(Debug, PartialEq, Clone, ValueEnum, VariantNames)]
 #[allow(non_camel_case_types)]
@@ -30,6 +31,16 @@ lazy_static! {
     static ref SOURCE_VARIANTS: String = Source::VARIANTS.join(",").to_string();
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+pub enum ShellCompletion {
+	Bash,
+	Elvish,
+	Fish,
+	Nu,
+	Powershell,
+	Zsh,
+}
+
 #[derive(Parser)]
 #[clap(name = "manix")]
 struct Opt {
@@ -42,12 +53,16 @@ struct Opt {
     strict: bool,
 
     /// Restrict search to chosen sources
-    #[arg(long, value_enum, default_value = &**SOURCE_VARIANTS, use_value_delimiter = true)]
+    #[arg(long, value_enum, default_value = &**SOURCE_VARIANTS, use_value_delimiter = true, value_hint = ValueHint::Other)]
     source: Vec<Source>,
 
     /// Query to search for
-    #[arg(name = "QUERY")]
+    #[arg(name = "QUERY", value_hint = ValueHint::CommandString)]
     query: String,
+    
+    /// Generate completions for the specified shell
+    #[arg(long = "generate", value_enum)]
+    generator: Option<ShellCompletion>,
 }
 
 fn build_source_and_add<T>(
@@ -113,8 +128,28 @@ where
     }
 }
 
+fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
+        generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
+}
+
 fn main() -> Result<()> {
     let opt: Opt = Opt::parse();
+
+    if let Some(generator) = opt.generator {
+        let mut cmd = Opt::command();
+        eprintln!("Generating completion file for {generator:?}...");
+
+	    match generator {
+	    	ShellCompletion::Bash => print_completions(Shell::Bash, &mut cmd),
+	    	ShellCompletion::Elvish => print_completions(Shell::Elvish, &mut cmd),
+	    	ShellCompletion::Fish => print_completions(Shell::Fish , &mut cmd),
+	    	ShellCompletion::Nu => print_completions(clap_complete_nushell::Nushell , &mut cmd),
+	    	ShellCompletion::Powershell => print_completions(Shell::PowerShell, &mut cmd),
+	    	ShellCompletion::Zsh => print_completions(Shell::Zsh , &mut cmd)
+	    }
+
+        Ok(())
+    } else {
 
     let cache_dir =
         xdg::BaseDirectories::with_prefix("manix").context("Failed to get a cache directory")?;
@@ -318,4 +353,4 @@ fn main() -> Result<()> {
     }
 
     Ok(())
-}
+}}
