@@ -1,27 +1,27 @@
 use crate::{
-    contains_insensitive_ascii,
-    starts_with_insensitive_ascii,
-    Cache,
-    DocEntry,
-    DocSource,
-    Errors,
+    contains_insensitive_ascii, starts_with_insensitive_ascii, Cache, DocEntry, DocSource, Errors,
     Lowercase,
 };
 use colored::*;
-use serde::{
-    Deserialize,
-    Serialize,
-};
-use std::{
-    collections::HashMap,
-    path::PathBuf,
-    process::Command,
-};
+use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, fmt::Display, path::PathBuf, process::Command};
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct OptionDescription {
+    _type: String,
+    text: String,
+}
+
+impl Display for OptionDescription {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.text)
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct OptionDocumentation {
     #[serde(default)]
-    description: String,
+    description: OptionDescription,
 
     #[serde(default, rename(serialize = "readOnly", deserialize = "readOnly"))]
     read_only: bool,
