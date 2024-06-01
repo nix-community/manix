@@ -1,20 +1,13 @@
 use crate::{
-    contains_insensitive_ascii,
-    starts_with_insensitive_ascii,
-    Cache,
-    DocEntry,
-    DocSource,
-    Errors,
+    contains_insensitive_ascii, starts_with_insensitive_ascii, Cache, DocEntry, DocSource, Errors,
     Lowercase,
 };
 use colored::*;
-use serde::{
-    Deserialize,
-    Serialize,
-};
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    path::PathBuf,
+    io,
+    path::{Path, PathBuf},
     process::Command,
 };
 
@@ -109,17 +102,35 @@ impl DocSource for OptionsDatabase {
 impl Cache for OptionsDatabase {}
 
 pub fn get_hm_json_doc_path() -> Result<PathBuf, std::io::Error> {
-    let base_path_output = Command::new("nix-build")
+    let base_path_res = Command::new("nix-build")
         .env("NIXPKGS_ALLOW_UNFREE", "1")
         .env("NIXPKGS_ALLOW_BROKEN", "1")
         .env("NIXPKGS_ALLOW_INSECURE", "1")
         .arg("-E")
         .arg(include_str!("nix/hm-options.nix"))
-        .output()
-        .map(|o| String::from_utf8(o.stdout).unwrap())?;
+        .output()?;
 
-    Ok(PathBuf::from(base_path_output.trim_end_matches('\n'))
-        .join("share/doc/home-manager/options.json"))
+    let base_path_output = if base_path_res.status.success() {
+        let path = String::from_utf8_lossy(&base_path_res.stdout);
+        PathBuf::from(path.trim_end_matches('\n'))
+    } else {
+        // we may still get the options from profile if user set manual.json.enable
+        let path = std::env::var("HOME")
+            .map(|home| Path::new(&home).join(".nix-profile"))
+            .expect("HOME must be set");
+
+        if path.join("share/doc/home-manager/options.json").exists() {
+            path
+        } else {
+            // propagate error from
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                String::from_utf8_lossy(&base_path_res.stderr),
+            ));
+        }
+    };
+
+    Ok(base_path_output.join("share/doc/home-manager/options.json"))
 }
 
 pub fn get_nixos_json_doc_path() -> Result<PathBuf, std::io::Error> {
