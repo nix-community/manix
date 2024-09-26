@@ -24,6 +24,7 @@
       defaultPackage = self.packages.${system}.manix;
       packages.manix = naersk'.buildPackage {
         src = ./.;
+        name = "manix";
       };
 
       # For `nix develop` (optional, can be skipped):
