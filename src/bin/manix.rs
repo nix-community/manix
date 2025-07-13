@@ -231,7 +231,12 @@ fn main() -> Result<()> {
         )
         .is_none()
         {
-            eprintln!("Tip: If you installed your home-manager through configuration.nix you can fix this error by adding the home-manager channel with this command: {}", "nix-channel --add https://github.com/rycee/home-manager/archive/master.tar.gz home-manager && nix-channel --update".bold());
+            eprintln!(
+                "Tip: If you installed your home-manager through configuration.nix you can fix this error \
+                by adding the home-manager channel with this command: {}\n\
+                Otherwise, make sure you have `manual.json.enable` set in your home configuration",
+                "nix-channel --add https://github.com/rycee/home-manager/archive/master.tar.gz home-manager && nix-channel --update".bold(),
+            );
         }
 
         if build_source_and_add(

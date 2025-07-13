@@ -1,5 +1,5 @@
 {
-  release ? "23.05",
+  release ? "24.05",
   isReleaseBranch ? false,
   pkgs ? import <nixpkgs> {},
 }: let
