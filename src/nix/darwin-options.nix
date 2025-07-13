@@ -8,7 +8,7 @@ let
     then attempt.value
     else fetchTarball "https://github.com/LnL7/nix-darwin/archive/refs/heads/master.tar.gz";
 
-  eval = import nix-darwin {configuration = {...}: {};};
+  eval = import nix-darwin {configuration = {config, ...}: { system.stateVersion = config.system.maxStateVersion; };};
   opts = eval.config.system.build.manual.optionsJSON;
 in
   runCommandLocal "options.json" {inherit opts;} ''
