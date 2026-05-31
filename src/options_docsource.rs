@@ -148,7 +148,5 @@ pub fn get_nd_json_doc_path() -> Result<PathBuf, std::io::Error> {
         .output()
         .map(|o| String::from_utf8(o.stdout).unwrap())?;
 
-    println!("{}", base_path_output.trim_end_matches('\n'));
-
     Ok(PathBuf::from(base_path_output.trim_end_matches('\n')))
 }

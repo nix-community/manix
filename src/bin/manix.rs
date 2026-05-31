@@ -13,7 +13,7 @@ use options_docsource::{
 use std::{path::PathBuf, io};
 use clap::{Parser, ValueEnum, ValueHint, Command, CommandFactory};
 use lazy_static::lazy_static;
-use clap_complete::{generate, Generator, Shell, generator};
+use clap_complete::{generate, Generator, Shell};
 use clap_mangen::Man;
 
 #[derive(Debug, PartialEq, Clone, ValueEnum, VariantNames)]
@@ -60,6 +60,10 @@ struct Opt {
     /// Query to search for
     #[arg(name = "QUERY", value_hint = ValueHint::CommandString)]
     query: String,
+
+    /// Output results as JSON
+    #[arg(short, long)]
+    json: bool,
     
     /// Generate completions for the specified shell
     #[arg(long = "generate", value_enum)]
@@ -134,6 +138,38 @@ where
 
 fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
         generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
+}
+
+fn print_human_output(results: &SearchResults) {
+    if !results.key_only_entries.is_empty() {
+        const SHOW_MAX_LEN: usize = 50;
+        print!("{}", "Here's what I found in nixpkgs:".bold());
+        for entry in results.key_only_entries.iter().take(SHOW_MAX_LEN) {
+            print!(" {}", entry.name().white());
+        }
+        if results.key_only_entries.len() > SHOW_MAX_LEN {
+            print!(" and {} more.", results.key_only_entries.len() - SHOW_MAX_LEN);
+        }
+        println!("\n");
+    }
+
+    for entry in &results.entries {
+        const LINE: &str = "────────────────────";
+        println!(
+            "{}\n{}\n{}",
+            entry.source().white(),
+            LINE.green(),
+            entry.pretty_printed()
+        );
+    }
+}
+
+fn print_json_output(results: &SearchResults) -> Result<()> {
+    println!(
+        "{}",
+        serde_json::to_string(results).context("Failed to serialize search results as JSON")?
+    );
+    Ok(())
 }
 
 fn main() -> Result<()> {
@@ -339,30 +375,12 @@ fn main() -> Result<()> {
     } else {
         aggregate_source.search_liberal(&query)
     };
-    let (entries, key_only_entries): (Vec<DocEntry>, Vec<DocEntry>) = entries
-        .into_iter()
-        .partition(|e| !matches!(e, DocEntry::NixpkgsTreeDoc(_)));
+    let results = SearchResults::from_entries(entries);
 
-    if !key_only_entries.is_empty() {
-        const SHOW_MAX_LEN: usize = 50;
-        print!("{}", "Here's what I found in nixpkgs:".bold());
-        for entry in key_only_entries.iter().take(SHOW_MAX_LEN) {
-            print!(" {}", entry.name().white());
-        }
-        if key_only_entries.len() > SHOW_MAX_LEN {
-            print!(" and {} more.", key_only_entries.len() - SHOW_MAX_LEN);
-        }
-        println!("\n");
-    }
-
-    for entry in entries {
-        const LINE: &str = "────────────────────";
-        println!(
-            "{}\n{}\n{}",
-            entry.source().white(),
-            LINE.green(),
-            entry.pretty_printed()
-        );
+    if opt.json {
+        print_json_output(&results)?;
+    } else {
+        print_human_output(&results);
     }
 
     Ok(())
