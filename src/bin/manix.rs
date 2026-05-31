@@ -10,7 +10,10 @@ use options_docsource::{
     OptionsDatabase,
     OptionsDatabaseType,
 };
-use std::{path::PathBuf, io};
+use std::{
+    io::{self, Write},
+    path::PathBuf,
+};
 use clap::{Parser, ValueEnum, ValueHint, Command, CommandFactory};
 use lazy_static::lazy_static;
 use clap_complete::{generate, Generator, Shell};
@@ -136,56 +139,60 @@ where
     }
 }
 
-fn print_completions<G: Generator>(gen: G, cmd: &mut Command) {
-        generate(gen, cmd, cmd.get_name().to_string(), &mut io::stdout());
+fn print_completions<G: Generator, W: Write>(gen: G, cmd: &mut Command, writer: &mut W) {
+    generate(gen, cmd, cmd.get_name().to_string(), writer);
 }
 
-fn print_human_output(results: &SearchResults) {
+fn print_human_output<W: Write>(results: &SearchResults, writer: &mut W) -> Result<()> {
     if !results.key_only_entries.is_empty() {
         const SHOW_MAX_LEN: usize = 50;
-        print!("{}", "Here's what I found in nixpkgs:".bold());
+        write!(writer, "{}", "Here's what I found in nixpkgs:".bold())?;
         for entry in results.key_only_entries.iter().take(SHOW_MAX_LEN) {
-            print!(" {}", entry.name().white());
+            write!(writer, " {}", entry.name().white())?;
         }
         if results.key_only_entries.len() > SHOW_MAX_LEN {
-            print!(" and {} more.", results.key_only_entries.len() - SHOW_MAX_LEN);
+            write!(writer, " and {} more.", results.key_only_entries.len() - SHOW_MAX_LEN)?;
         }
-        println!("\n");
+        writeln!(writer, "\n")?;
     }
 
     for entry in &results.entries {
         const LINE: &str = "────────────────────";
-        println!(
+        writeln!(
+            writer,
             "{}\n{}\n{}",
             entry.source().white(),
             LINE.green(),
             entry.pretty_printed()
-        );
+        )?;
     }
+
+    Ok(())
 }
 
-fn print_json_output(results: &SearchResults) -> Result<()> {
-    println!(
-        "{}",
-        serde_json::to_string(results).context("Failed to serialize search results as JSON")?
-    );
+fn print_json_output<W: Write>(results: &SearchResults, writer: &mut W) -> Result<()> {
+    serde_json::to_writer(&mut *writer, results)
+        .context("Failed to serialize search results as JSON")?;
+    writeln!(writer)?;
     Ok(())
 }
 
 fn main() -> Result<()> {
     let opt: Opt = Opt::parse();
+    let stdout = io::stdout();
+    let mut stdout = stdout.lock();
 
     if let Some(generator) = opt.generator {
         let mut cmd = Opt::command();
         eprintln!("Generating completion file for {generator:?}...");
 
 	    match generator {
-	    	ShellCompletion::Bash => print_completions(Shell::Bash, &mut cmd),
-	    	ShellCompletion::Elvish => print_completions(Shell::Elvish, &mut cmd),
-	    	ShellCompletion::Fish => print_completions(Shell::Fish , &mut cmd),
-	    	ShellCompletion::Nu => print_completions(clap_complete_nushell::Nushell , &mut cmd),
-	    	ShellCompletion::Powershell => print_completions(Shell::PowerShell, &mut cmd),
-	    	ShellCompletion::Zsh => print_completions(Shell::Zsh , &mut cmd)
+	    	ShellCompletion::Bash => print_completions(Shell::Bash, &mut cmd, &mut stdout),
+	    	ShellCompletion::Elvish => print_completions(Shell::Elvish, &mut cmd, &mut stdout),
+	    	ShellCompletion::Fish => print_completions(Shell::Fish , &mut cmd, &mut stdout),
+	    	ShellCompletion::Nu => print_completions(clap_complete_nushell::Nushell , &mut cmd, &mut stdout),
+	    	ShellCompletion::Powershell => print_completions(Shell::PowerShell, &mut cmd, &mut stdout),
+	    	ShellCompletion::Zsh => print_completions(Shell::Zsh , &mut cmd, &mut stdout)
 	    }
 
         Ok(())
@@ -195,7 +202,9 @@ fn main() -> Result<()> {
         let cmd = Opt::command();
         eprintln!("Generating manpage...");
         
-        Man::new(cmd).render(&mut io::stdout()).unwrap();
+        Man::new(cmd)
+            .render(&mut stdout)
+            .context("Failed to render manpage")?;
 
         Ok(())
     } else {
@@ -378,9 +387,9 @@ fn main() -> Result<()> {
     let results = SearchResults::from_entries(entries);
 
     if opt.json {
-        print_json_output(&results)?;
+        print_json_output(&results, &mut stdout)?;
     } else {
-        print_human_output(&results);
+        print_human_output(&results, &mut stdout)?;
     }
 
     Ok(())
