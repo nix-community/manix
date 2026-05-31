@@ -7,6 +7,7 @@ use rayon::iter::{
     IntoParallelRefIterator,
     ParallelIterator,
 };
+use serde::ser::SerializeStruct;
 use std::path::PathBuf;
 use thiserror::Error;
 use xml_docsource::XmlFuncDocumentation;
@@ -55,6 +56,25 @@ pub enum Errors {
     },
 }
 
+#[derive(Debug, serde::Serialize)]
+pub struct SearchResults {
+    pub entries: Vec<DocEntry>,
+    pub key_only_entries: Vec<DocEntry>,
+}
+
+impl SearchResults {
+    pub fn from_entries(entries: Vec<DocEntry>) -> Self {
+        let (entries, key_only_entries) = entries
+            .into_iter()
+            .partition(|entry| !matches!(entry, DocEntry::NixpkgsTreeDoc(_)));
+
+        Self {
+            entries,
+            key_only_entries,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum DocEntry {
     OptionDoc(OptionsDatabaseType, OptionDocumentation),
@@ -64,6 +84,15 @@ pub enum DocEntry {
 }
 
 impl DocEntry {
+    pub fn kind(&self) -> &'static str {
+        match self {
+            DocEntry::OptionDoc(_, _) => "option",
+            DocEntry::CommentDoc(_) => "comment",
+            DocEntry::XmlFuncDoc(_) => "xml_function",
+            DocEntry::NixpkgsTreeDoc(_) => "nixpkgs_tree",
+        }
+    }
+
     pub fn name(&self) -> String {
         match self {
             DocEntry::OptionDoc(_, x) => x.name(),
@@ -91,6 +120,33 @@ impl DocEntry {
             DocEntry::XmlFuncDoc(_) => "Nixpkgs Documentation",
             DocEntry::NixpkgsTreeDoc(_) => "Nixpkgs Tree",
         }
+    }
+}
+
+impl serde::Serialize for DocEntry {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut state = serializer.serialize_struct("DocEntry", 4)?;
+        state.serialize_field("kind", self.kind())?;
+        state.serialize_field("source", self.source())?;
+        state.serialize_field("name", &self.name())?;
+        match self {
+            DocEntry::OptionDoc(_, documentation) => {
+                state.serialize_field("documentation", documentation)?;
+            }
+            DocEntry::CommentDoc(documentation) => {
+                state.serialize_field("documentation", documentation)?;
+            }
+            DocEntry::XmlFuncDoc(documentation) => {
+                state.serialize_field("documentation", documentation)?;
+            }
+            DocEntry::NixpkgsTreeDoc(_) => {
+                state.serialize_field("documentation", &Option::<()>::None)?;
+            }
+        }
+        state.end()
     }
 }
 
