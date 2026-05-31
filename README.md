@@ -31,7 +31,13 @@ If you want to use it in your editor, check [ElKowar's rnix-lsp fork](https://gi
 You can use manix with fzf via this command:
 
 ```sh
-manix "" | grep '^# ' | sed 's/^# \(.*\) (.*/\1/;s/ (.*//;s/^# //' | fzf --preview="manix '{}'" | xargs manix
+manix "" | sed -n 's/^# \(.*\) \?.*/\1/p' | fzf --preview="manix '{}'" | xargs manix
+```
+
+Or, alternatively, without the final output if preview is enough:
+
+```sh
+manix "" | sed -n 's/^# \(.*\) \?.*/\1/p' | fzf --preview="manix '{}'"
 ```
 Alternatively, you can use the following script by adding it to your Home Manager configuration:
 ```nix
