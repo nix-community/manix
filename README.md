@@ -28,8 +28,67 @@ If you want to use it in your editor, check [ElKowar's rnix-lsp fork](https://gi
 
 ### fzf
 
+You can use manix with fzf via this command:
+
 ```sh
 manix "" | grep '^# ' | sed 's/^# \(.*\) (.*/\1/;s/ (.*//;s/^# //' | fzf --preview="manix '{}'" | xargs manix
+```
+Alternatively, you can use the following script by adding it to your Home Manager configuration:
+```nix
+(pkgs.callPackage PATH/TO/SCRIPT/SCRIPT.nix {})
+```
+
+This script caches all options for 10 days (you can adjust this value inside the script) or forces a refresh using the `-r` flag. Compared to the previous manix command, it trades a little disk space for significant time savings during searches.
+
+Its dependencies are `manix`, `ripgrep`, and `fzf`.
+
+```nix
+{ writeShellApplication, manix, ripgrep, fzf, ... }:
+
+let
+  cacheTime = "10";
+in
+
+writeShellApplication {
+  name = "custom-manix";
+  runtimeInputs = [
+    manix
+    ripgrep
+    fzf
+  ];
+  text = ''
+CACHE_DIR="''${XDG_CACHE_HOME:-$HOME/.cache}"
+CACHE_FILE="$CACHE_DIR/custom-manix-options.txt"
+mkdir -p "$CACHE_DIR"
+
+REGENERATE=0
+
+# Check if the -r flag was passed
+if [ "''${1:-}" = "-r" ]; then
+  REGENERATE=1
+fi
+
+# Regenerate cache if it doesn't exist or is older than cacheTime days
+if [ ! -f "$CACHE_FILE" ] || [ "$(find "$CACHE_FILE" -mtime +${cacheTime} -print)" ]; then
+  REGENERATE=1
+fi
+
+if [ $REGENERATE -eq 1 ]; then
+  echo "(Re)building custom-manix cache..."
+  mkdir -p "$(dirname "$CACHE_FILE")"
+  manix "" \
+    | rg '^(?:\x1b\[[0-9;]*m)*# ' \
+    | sed 's/\x1b\[[0-9;]*m//g; s/^# //' \
+    | rg -v '^(<|.*https?://)' \
+    > "$CACHE_FILE"
+fi
+
+# Read from cache and pipe into fzf
+cat "$CACHE_FILE" \
+  | fzf --preview "manix {}" \
+  | xargs manix
+  '';
+}
 ```
 
 ## Installation
